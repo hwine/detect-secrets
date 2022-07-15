@@ -1,9 +1,9 @@
+import itertools
 from typing import Generator
 from typing import List
 
 from .color import AnsiColor
 from .color import colorize
-from detect_secrets.exceptions import SecretNotFoundOnSpecifiedLineError
 
 
 def get_code_snippet(
@@ -27,7 +27,7 @@ def get_code_snippet(
         target_line_index = lines_of_context
 
     return CodeSnippet(
-        snippet=lines[start_line_index:end_line_index],
+        snippet=list(itertools.islice(lines, start_line_index, end_line_index)),
         start_line=start_line_index,
         target_index=target_line_index,
     )
@@ -72,6 +72,7 @@ class CodeSnippet:
         """
         :param payload: string to highlight, on chosen line
         """
+        # HACK workaround for new variation of https://github.com/Yelp/detect-secrets/issues/227
         try:
             index_of_payload = self.target_line.lower().index(payload.lower())
             end_of_payload = index_of_payload + len(payload)
@@ -81,10 +82,12 @@ class CodeSnippet:
                 self.apply_highlight(self.target_line[index_of_payload:end_of_payload]),
                 self.target_line[end_of_payload:],
             )
-
-            return self
         except ValueError:
-            raise SecretNotFoundOnSpecifiedLineError(self.target_index)
+            # ignore, but be noisy
+            print('Payload not found, probably in yaml file')
+            pass
+
+        return self
 
     def get_line_number(self, line_number: int) -> str:
         """Broken out, for custom colorization."""
